@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Como Diyanet Camisi - Dijital Pano</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fontlar -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+
+    <!-- İkonlar -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        /* TEMEL AYARLAR */
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: #000000 !important;
+            color: white;
+            overflow: hidden;
+            user-select: none; /* TV'de seçim yapılmasını engelle */
+        }
+
+        :root {
+            --primary-red: #D40015;
+            --dark-red: #9B000F;
+        }
+
+        .tabular-nums { font-variant-numeric: tabular-nums; }
+        .font-rounded { font-family: 'Nunito', sans-serif; }
+        .hidden { display: none !important; }
+
+        /* Sol Panel Stilleri */
+        .left-panel {
+            background-color: #450a0a !important;
+            color: #ffffff !important;
+            border-right: 2px solid #7f1d1d;
+        }
+
+        /* Vakit Satırı Stilleri */
+        .prayer-row {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left: 0.8vh solid transparent;
+            position: relative;
+        }
+        
+        /* Geçmiş Vakitler */
+        .prayer-past {
+            opacity: 0.5;
+            background-color: #2a0505 !important; 
+            color: #a1a1aa !important; 
+            border-left: 0.8vh solid #500707; 
+            transform: scale(0.98);
+        }
+        
+        /* Aktif Vakit */
+        .prayer-active {
+            background: linear-gradient(90deg, #dc2626 0%, #b91c1c 100%) !important; 
+            color: #ffffff !important; 
+            border-left: 1.5vh solid #ffffff; 
+            box-shadow: 0 1vh 3vh rgba(220, 38, 38, 0.4);
+            transform: scale(1.03) translateX(1vh);
+            z-index: 20;
+            border-radius: 1vh;
+        }
+        .prayer-active .text-white { color: #ffffff !important; }
+
+        /* Gelecek Vakitler */
+        .prayer-future {
+            background-color: #551010 !important; 
+            color: #ffffff !important; 
+            border-left: 0.8vh solid #7f1d1d; 
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .countdown-text {
+            font-feature-settings: "tnum";
+            text-shadow: 0.2vh 0.2vh 0.5vh rgba(0,0,0,0.2);
+        }
+
+        /* Slayt Gösterisi */
+        .slide-image {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            object-fit: cover; opacity: 0; z-index: 1; transition: opacity 1.5s ease-in-out;
+        }
+        .slide-active { opacity: 1; animation: ken-burns 25s ease-out forwards; }
+        @keyframes ken-burns { 0% { transform: scale(1); } 100% { transform: scale(1.15); } }
+
+        /* Efektler */
+        .flash-effect {
+            position: fixed; inset: 0; background: white; z-index: 9999;
+            pointer-events: none; animation: holy-flash 3s ease-in-out forwards;
+        }
+        @keyframes holy-flash { 0%, 100% { opacity: 0; } 50% { opacity: 0.8; } }
+
+        .pulse-text { animation: pulse-red 2s infinite; }
+        @keyframes pulse-red {
+            0%, 100% { color: #ef4444; text-shadow: 0 0 1vh rgba(255,0,0,0.8); }
+            50% { color: #fff; text-shadow: 0 0 2vh rgba(255,255,255,1); }
+        }
+        
+        .text-shadow-strong { text-shadow: 0 0.4vh 0.8vh rgba(0,0,0,0.8); }
+        .text-shadow-outline { text-shadow: 0.3vh 0.3vh 0 #000, -0.1vh -0.1vh 0 #000; }
+
+        /* Sağ Panel Arka Planı */
+        .right-panel-bg {
+            background-color: #fff1f2; 
+        }
+
+        /* Ezan Modu */
+        #ezan-overlay {
+            opacity: 0; visibility: hidden; transition: opacity 1s, visibility 1s;
+            background-image: url('https://images.unsplash.com/photo-1548625361-9872e457f611?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80'); 
+            background-size: cover; background-position: center;
+        }
+        #ezan-overlay.active { opacity: 1; visibility: visible; }
+        .blur-backdrop { backdrop-filter: blur(20px); background-color: rgba(0,0,0,0.85); }
+
+        /* KAYAN YAZI */
+        .marquee-container {
+            height: 6vh;
+            background-color: #7f1d1d;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            white-space: nowrap;
+            border-top: 0.5vh solid #ef4444;
+            width: 100%;
+            position: relative;
+            z-index: 40;
+        }
+        .marquee-content {
+            display: inline-block;
+            padding-left: 100%;
+            animation: marquee 45s linear infinite;
+            font-size: 2.5vh;
+            font-weight: 800;
+            color: white;
+            font-family: 'Nunito', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+
+        /* QR Kodu Alanı */
+        #qrcode {
+            background: white;
+            padding: 0.5vh;
+            border-radius: 4px;
+        }
+        #qrcode img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Duyuru Pop-up */
+        #announcement-banner {
+            position: fixed; top: -25vh; left: 0; right: 0; height: 18vh;
+            background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
+            z-index: 9998;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.7);
+            transition: top 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border-bottom: 0.8vh solid #fca5a5;
+        }
+        #announcement-banner.show { top: 0; }
+
+        /* Input stilleri (Admin) */
+        .admin-input-group label { display: block; font-size: 0.8rem; font-weight: 700; color: #64748b; margin-bottom: 0.25rem; text-transform: uppercase; }
+        .admin-input-group input { width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-weight: 600; color: #1e293b; }
+        .admin-input-group input:focus { outline: none; border-color: #dc2626; ring: 2px solid #fecaca; }
+        
+        /* Mod Göstergesi */
+        .mode-badge {
+            font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 800; text-transform: uppercase;
+        }
+        .mode-local { background-color: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
+        .mode-firebase { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col text-slate-900 selection:bg-red-100 relative overflow-hidden">
+
+    <audio id="ezan-player" src="https://media.blubrry.com/muslim_central_quran/podcasts.qurancentral.com/mishary-rashid-alafasy/mishary-rashid-alafasy-adhan.mp3" preload="auto"></audio>
+    <div id="flash-layer" class="hidden"></div>
+
+    <!-- TAM EKRAN EZAN OVERLAY -->
+    <div id="ezan-overlay" class="fixed inset-0 z-[9999] flex items-center justify-center">
+        <div class="absolute inset-0 blur-backdrop"></div>
+        <div class="relative z-10 text-center text-white px-4 w-full">
+            <div class="mb-[3vh] flex justify-center">
+                <div class="w-[18vh] h-[18vh] bg-red-600 rounded-full flex items-center justify-center border-4 border-white/30 shadow-[0_0_50px_rgba(220,38,38,0.6)] animate-pulse">
+                    <i data-lucide="volume-2" class="w-[10vh] h-[10vh] text-white"></i>
+                </div>
+            </div>
+            <h1 class="text-[9vh] font-black font-rounded tracking-tight mb-[2vh] text-shadow-strong leading-none">EZAN VAKTİ</h1>
+            <p id="ezan-prayer-name" class="text-[6vh] font-bold text-red-400 mb-[5vh] uppercase tracking-widest text-shadow-outline">...</p>
+            
+            <div class="flex flex-col items-center gap-[2vh] animate-bounce">
+                <div class="bg-white text-red-700 px-[4vh] py-[1.5vh] rounded-full font-black text-[2.5vh] shadow-xl uppercase tracking-wider">
+                    Lütfen Telefonları Sessize Alın
+                </div>
+                <div class="text-white/80 font-semibold text-[2vh]">
+                    (Si prega di silenziare i telefoni)
+                </div>
+            </div>
+            
+            <button onclick="stopAdhan()" class="mt-[10vh] border border-white/20 hover:bg-white/10 text-white/50 px-6 py-2 rounded-full text-sm transition-colors">
+                Sesi Kapat
+            </button>
+        </div>
+    </div>
+
+    <!-- DUYURU BANNER -->
+    <div id="announcement-banner">
+        <div class="flex items-center gap-8 px-8 max-w-[90%]">
+            <div class="bg-yellow-400 p-[1.5vh] rounded-full shadow-lg shrink-0 animate-bounce">
+                <i data-lucide="megaphone" class="w-[5vh] h-[5vh] text-red-900"></i>
+            </div>
+            <div class="text-left">
+                <h2 class="text-[2.5vh] font-black text-yellow-300 uppercase tracking-widest leading-none mb-2 opacity-90">DİKKAT / ATTENZIONE</h2>
+                <p id="announcement-text" class="text-[4vh] font-bold text-white leading-tight font-rounded drop-shadow-md">...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOD 1: TV EKRANI -->
+    <div id="display-mode" class="h-full w-full flex flex-col">
+        <!-- 1. ÜST BAR (Yükseklik: 14vh) -->
+        <header class="h-[14vh] bg-white shadow-lg flex items-center justify-between px-[2vw] border-b-[0.6vh] border-red-700 relative z-30 shrink-0">
+            <div class="flex items-center gap-[1.5vw]">
+                <div class="w-[11vh] h-[11vh] relative flex items-center justify-center p-[0.5vh] bg-white rounded-full shadow-md border border-slate-100 shrink-0">
+                    <img src="data:image/png;base64,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" alt="DITIB Logo" class="w-full h-full object-contain">
+                </div>
+                <div>
+                    <h1 class="text-[4vh] font-black tracking-tighter text-red-700 leading-none">DİTİB COMO</h1>
+                    <p class="text-[1.8vh] text-slate-500 font-bold tracking-wide mt-[0.5vh] uppercase">Centro Culturale Turco</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-[2vw]">
+                <!-- QR Code (Yönetici) -->
+                <div class="bg-white p-[0.5vh] border border-gray-200 rounded-lg shadow-sm flex flex-col items-center group cursor-pointer" onclick="toggleFullScreen()">
+                    <div id="qrcode" class="w-[7vh] h-[7vh] opacity-80 group-hover:opacity-100 transition-opacity"></div>
+                </div>
+                <!-- Saat -->
+                <div class="text-right shrink-0">
+                    <div id="clock-display" class="text-[8vh] font-black text-slate-800 tabular-nums leading-none tracking-tight">00:00</div>
+                    <div id="date-display" class="text-[2.2vh] text-red-600 font-bold mt-[0.5vh] uppercase tracking-wide">...</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 2. ANA İÇERİK (Yükseklik: 80vh) -->
+        <main class="flex-1 flex h-[80vh] overflow-hidden">
+            
+            <!-- A) SOL PANEL: Vakitler -->
+            <aside class="w-[28%] left-panel flex flex-col h-full shadow-2xl z-20 relative">
+                <div class="h-[10%] flex items-center px-[2vw] border-b border-white/10 bg-[#2a0505] shrink-0">
+                    <h2 class="text-[2.2vh] font-black text-white flex items-center gap-[1.5vh] tracking-wider">
+                        <i data-lucide="calendar" class="text-red-400 w-[2.5vh] h-[2.5vh]"></i>
+                        NAMAZ VAKİTLERİ
+                    </h2>
+                </div>
+
+                <div id="prayer-list" class="flex-1 flex flex-col justify-center gap-[0.8vh] px-[1vw] py-[2vh] overflow-hidden min-h-0 bg-gradient-to-b from-[#450a0a] to-[#2a0505]">
+                    <!-- JS ile doldurulacak -->
+                </div>
+                
+                <!-- Cuma Vakti -->
+                <div class="h-[15%] mt-auto border-t border-red-900/50 bg-[#2a0505] flex items-center justify-center px-[1.5vw] shrink-0">
+                    <div class="bg-gradient-to-r from-red-900 to-red-800 border border-red-700/50 rounded-xl p-[1.5vh] flex items-center justify-between shadow-lg w-full">
+                        <div class="flex flex-col justify-center">
+                            <p class="text-[1.4vh] font-bold text-red-300 uppercase tracking-widest mb-[0.2vh]">CUMA NAMAZI</p>
+                            <p id="friday-time-display" class="text-[3.5vh] font-black text-white tabular-nums leading-none">13:00</p>
+                        </div>
+                        <i data-lucide="users" class="w-[4vh] h-[4vh] text-red-400/50"></i>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- B) SAĞ PANEL: Görsel & Bilgi -->
+            <section class="w-[72%] relative flex flex-col items-center text-center overflow-hidden right-panel-bg">
+                
+                <!-- Slayt Arka Planı -->
+                <div id="slideshow-container" class="absolute inset-0 z-0 bg-[#fff1f2]">
+                    <!-- JS ile resimler buraya -->
+                </div>
+                <div class="absolute inset-0 z-10 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+
+                <!-- Ana İçerik -->
+                <div class="relative z-20 flex-1 flex flex-col items-center justify-center w-full px-[4vw]">
+                    
+                    <!-- Durum Etiketi -->
+                    <div id="status-container" class="mb-[3vh] transition-all duration-500"></div>
+                    
+                    <!-- Vakit İsmi -->
+                    <div class="mb-[4vh] w-full drop-shadow-2xl">
+                        <h2 id="main-prayer-display" class="text-[13vh] leading-none font-black text-white tracking-tighter font-rounded text-shadow-strong">...</h2>
+                        <p id="main-prayer-sub" class="text-[4vh] font-bold text-red-200 mt-[1vh] font-rounded uppercase tracking-widest opacity-90">...</p>
+                    </div>
+
+                    <!-- Geri Sayım -->
+                    <div id="countdown-box" class="hidden bg-white/10 backdrop-blur-md px-[6vh] py-[2vh] rounded-[3vh] border border-white/20 mb-[3vh] shadow-2xl">
+                        <p class="text-[2vh] text-red-200 font-bold mb-[0.5vh] uppercase tracking-widest">Vaktin Çıkmasına</p>
+                        <div id="countdown-display" class="text-[9vh] font-black text-white tabular-nums tracking-tighter font-rounded leading-none text-shadow-strong">--:--:--</div>
+                    </div>
+
+                </div>
+
+                <!-- Alt Alan: Hadis & Mesaj -->
+                <div class="relative z-30 w-full flex flex-col items-center pb-[5vh] px-[4vw] gap-[2vh] shrink-0">
+                    
+                    <!-- Hadis -->
+                    <div class="w-full max-w-[90%] bg-red-900/80 backdrop-blur-lg px-[4vh] py-[2.5vh] rounded-2xl border-l-4 border-white/50 transition-all duration-700 shadow-xl" id="hadith-box">
+                        <p id="hadith-text" class="text-[2.8vh] font-serif italic leading-tight font-medium text-white text-center">
+                            "Temizlik imandandır."
+                        </p>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+
+        <!-- 3. ALT KAYAN YAZI (Yükseklik: 6vh) -->
+        <div class="marquee-container shadow-[0_-5px_15px_rgba(0,0,0,0.3)]">
+            <div class="marquee-content" id="marquee-text">DİTİB COMO CAMİİSİNE HOŞGELDİNİZ • WELCOME TO COMO MOSQUE • BENVENUTI</div>
+        </div>
+    </div>
+
+    <!-- ADMIN MODU -->
+    <div id="admin-mode" class="h-full w-full bg-slate-100 p-4 overflow-auto hidden pb-20">
+        <div class="max-w-xl mx-auto space-y-4">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border-b-4 border-red-600 text-center relative overflow-hidden">
+                <!-- Mod Göstergesi -->
+                <div class="absolute top-4 right-4">
+                    <span id="storage-indicator" class="mode-badge mode-local">YÜKLENİYOR...</span>
+                </div>
+                
+                <h1 class="text-2xl font-black text-slate-800">YÖNETİM PANELİ</h1>
+                <p class="text-slate-500 text-sm font-bold uppercase tracking-wide">Como Diyanet Camisi</p>
+            </div>
+
+            <!-- Vakit Ayarları -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2">
+                    <i data-lucide="clock" class="text-red-600"></i> Namaz Vakitleri
+                </h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="admin-input-group">
+                        <label>İmsak (Alba)</label>
+                        <input type="time" id="time-imsak">
+                    </div>
+                    <div class="admin-input-group">
+                        <label>Güneş (Sole)</label>
+                        <input type="time" id="time-gunes">
+                    </div>
+                    <div class="admin-input-group">
+                        <label>Öğle (Dhuhr)</label>
+                        <input type="time" id="time-ogle">
+                    </div>
+                    <div class="admin-input-group">
+                        <label>İkindi (Asr)</label>
+                        <input type="time" id="time-ikindi">
+                    </div>
+                    <div class="admin-input-group">
+                        <label>Akşam (Maghrib)</label>
+                        <input type="time" id="time-aksam">
+                    </div>
+                    <div class="admin-input-group">
+                        <label>Yatsı (Isha)</label>
+                        <input type="time" id="time-yatsi">
+                    </div>
+                    <div class="col-span-2 pt-2 border-t border-slate-100 mt-2">
+                         <div class="admin-input-group">
+                            <label class="text-red-600">Cuma Namazı Saati</label>
+                            <input type="time" id="time-cuma">
+                        </div>
+                    </div>
+                </div>
+                <button onclick="savePrayerTimes()" class="w-full mt-4 bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl font-bold transition-colors">VAKİTLERİ KAYDET</button>
+            </div>
+
+            <!-- İçerik Ayarları -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2">
+                    <i data-lucide="message-square" class="text-blue-600"></i> İçerik Yönetimi
+                </h3>
+                
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kayan Yazı (Alt Bant)</label>
+                    <textarea id="admin-marquee-input" rows="2" class="w-full p-3 border border-slate-300 rounded-lg text-sm font-semibold" placeholder="Duyurular buraya..."></textarea>
+                    <button onclick="updateMarquee()" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold text-sm">GÜNCELLE</button>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Büyük Duyuru (Pop-up)</label>
+                    <input type="text" id="admin-announcement-input" class="w-full p-3 border border-slate-300 rounded-lg text-sm font-semibold" placeholder="Örn: Yatsı namazından sonra sohbet...">
+                    <div class="flex gap-2 mt-2">
+                        <button onclick="sendAnnouncement()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold text-sm">YAYINLA</button>
+                        <button onclick="clearAnnouncement()" class="px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded-lg font-bold text-sm">TEMİZLE</button>
+                    </div>
+                </div>
+            </div>
+
+             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2">
+                    <i data-lucide="image" class="text-purple-600"></i> Arka Plan Resmi
+                </h3>
+                <input type="file" id="admin-image-input" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
+                <button onclick="uploadImage()" class="w-full mt-3 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-bold text-sm">RESMİ GÖNDER</button>
+                <button onclick="resetImage()" class="w-full mt-2 text-red-500 text-xs font-bold underline">Varsayılan Slayta Dön</button>
+            </div>
+
+            <div class="text-center py-4">
+                <a href="index.html" class="inline-flex items-center gap-2 text-red-600 font-bold bg-red-50 px-6 py-3 rounded-full hover:bg-red-100 transition-colors">
+                    <i data-lucide="monitor"></i> EKRAN MODUNA DÖN
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- FIREBASE KURULUMU ---
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getFirestore, doc, onSnapshot, setDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+
+        let db, settingsDocRef, auth;
+        let isFirebaseActive = false;
+
+        // --- GITHUB KULLANICISI İÇİN FIREBASE AYARLARI ---
+        // Buraya kendi Firebase Config bilgilerini yapıştırırsan,
+        // sistem otomatik olarak Cloud moduna geçer.
+        const manualFirebaseConfig = null; 
+        // ÖRNEK: const manualFirebaseConfig = { apiKey: "...", authDomain: "...", ... };
+
+        // Firebase Başlatma Mantığı
+        async function initApp() {
+            try {
+                let config = null;
+                let appId = 'default-app';
+
+                // 1. Ortamdan Config Al (Canvas/Preview Modu)
+                if (typeof __firebase_config !== 'undefined') {
+                    config = JSON.parse(__firebase_config);
+                    if (typeof __app_id !== 'undefined') appId = __app_id;
+                } 
+                // 2. Manuel Config Al (GitHub/Canlı Modu)
+                else if (manualFirebaseConfig) {
+                    config = manualFirebaseConfig;
+                    appId = 'como-mosque-app'; // Sabit bir ID
+                }
+
+                if (config) {
+                    const app = initializeApp(config);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+                    
+                    // Önce Auth
+                    await signInAnonymously(auth);
+                    
+                    // Sonra Doc Referansı
+                    settingsDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'mosque_settings_v2', 'main');
+                    isFirebaseActive = true;
+                    updateStorageIndicator(true);
+                    console.log("Firebase bağlantısı başarılı.");
+                } else {
+                    console.warn("Firebase config bulunamadı. Yerel mod (LocalStorage) kullanılıyor.");
+                    updateStorageIndicator(false);
+                }
+            } catch (e) {
+                console.warn("Firebase başlatma hatası, yerel moda geçiliyor:", e);
+                updateStorageIndicator(false);
+            }
+        }
+
+        function updateStorageIndicator(isActive) {
+            const el = document.getElementById('storage-indicator');
+            if (el) {
+                if (isActive) {
+                    el.textContent = "CANLI (FIREBASE)";
+                    el.className = "mode-badge mode-firebase";
+                } else {
+                    el.textContent = "YEREL (BU CİHAZ)";
+                    el.className = "mode-badge mode-local";
+                }
+            }
+        }
+
+        // --- GLOBAL DEĞİŞKENLER ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const isAdmin = urlParams.get('admin') === 'true';
+
+        let customImage = null;
+        let defaultImages = [
+            "https://images.unsplash.com/photo-1548625361-9872e457f611?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80",
+            "https://images.unsplash.com/photo-1564769662533-4f00a87b4056?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80",
+            "https://images.unsplash.com/photo-1519817914152-22d216bb9170?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80",
+            "https://images.unsplash.com/photo-1551041777-ed02bed74b47?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80"
+        ];
+        let currentSlideIdx = 0;
+        let currentHadisIndex = 0;
+        let adhanPlaying = false;
+        
+        let prayerTimes = [
+            { id: "imsak", tr: "İmsak", it: "Alba", time: "05:45" },
+            { id: "gunes", tr: "Güneş", it: "Sole", time: "07:15" },
+            { id: "ogle", tr: "Öğle", it: "Dhuhr", time: "12:30" },
+            { id: "ikindi", tr: "İkindi", it: "Asr", time: "14:55" },
+            { id: "aksam", tr: "Akşam", it: "Maghrib", time: "17:10" },
+            { id: "yatsi", tr: "Yatsı", it: "Isha", time: "18:45" }
+        ];
+        let fridayTime = "13:00";
+
+        const hadisList = [
+            "Namaz dinin direğidir.",
+            "Temizlik imandandır.",
+            "Hayra vesile olan yapan gibidir.",
+            "İnsanların en hayırlısı, insanlara faydalı olandır.",
+            "Tebessüm sadakadır.",
+            "Kolaylaştırınız, zorlaştırmayınız; müjdeleyiniz, nefret ettirmeyiniz."
+        ];
+
+        // --- BAŞLATMA ---
+        window.addEventListener('load', async () => {
+            lucide.createIcons();
+            
+            // UI Modunu Ayarla
+            if (isAdmin) {
+                document.getElementById('display-mode').classList.add('hidden');
+                document.getElementById('admin-mode').classList.remove('hidden');
+                // Admin fonksiyonlarını yükle
+                initAdmin();
+            } else {
+                document.getElementById('display-mode').classList.remove('hidden');
+                document.getElementById('admin-mode').classList.add('hidden');
+                // Display fonksiyonlarını yükle
+                initDisplay();
+            }
+
+            // Uygulamayı Başlat
+            await initApp();
+            
+            // Eğer Firebase aktifse dinlemeye başla, değilse yerel
+            startDataSync();
+        });
+
+        // --- VERİ SENKRONİZASYONU ---
+        function getLocalDB() { return JSON.parse(localStorage.getItem('como_mosque_db') || '{}'); }
+        function saveLocalDB(data) {
+            const current = getLocalDB();
+            localStorage.setItem('como_mosque_db', JSON.stringify({ ...current, ...data }));
+            window.dispatchEvent(new Event('storage'));
+        }
+
+        function startDataSync() {
+            // Veri geldiğinde çalışacak fonksiyon
+            const handleData = (data) => {
+                if (!data) return;
+                
+                // Marquee
+                const mq = document.getElementById('marquee-text');
+                if (mq && data.marquee && mq.innerHTML !== data.marquee) mq.innerHTML = data.marquee;
+                
+                // Announcement
+                if (data.announcement) {
+                    const banner = document.getElementById('announcement-banner');
+                    const txt = document.getElementById('announcement-text');
+                    if (txt) txt.textContent = data.announcement;
+                    if (banner && !banner.classList.contains('show')) {
+                        banner.classList.add('show');
+                        setTimeout(() => banner.classList.remove('show'), 15000);
+                    }
+                }
+
+                // Image
+                if (data.customImage !== undefined) {
+                    customImage = data.customImage;
+                    updateSlideshowState();
+                }
+
+                // Prayer Times
+                if (data.prayerTimes) {
+                    prayerTimes = data.prayerTimes;
+                    // Eğer admin panelindeysek inputları da güncelle (Canlı senkronizasyon)
+                    if (isAdmin) fillAdminForm(data);
+                    updateSystem();
+                }
+                if (data.fridayTime) {
+                    fridayTime = data.fridayTime;
+                    const fEl = document.getElementById('friday-time-display');
+                    if(fEl) fEl.textContent = fridayTime;
+                    if(isAdmin) {
+                         const fInput = document.getElementById('time-cuma');
+                         if(fInput) fInput.value = fridayTime;
+                    }
+                }
+            };
+
+            if (isFirebaseActive && settingsDocRef) {
+                onSnapshot(settingsDocRef, (snap) => { if(snap.exists()) handleData(snap.data()); });
+            } else {
+                window.addEventListener('storage', () => handleData(getLocalDB()));
+                handleData(getLocalDB());
+            }
+        }
+
+        // --- DISPLAY MODU FONKSİYONLARI ---
+        function initDisplay() {
+            if (typeof QRCode !== 'undefined') {
+                const qrDiv = document.getElementById("qrcode");
+                if (qrDiv) {
+                    qrDiv.innerHTML = '';
+                    const adminUrl = window.location.href.split('?')[0] + "?admin=true";
+                    new QRCode(qrDiv, { text: adminUrl, width: 128, height: 128, colorDark: "#000", colorLight: "#fff" });
+                }
+            }
+
+            setInterval(updateSystem, 1000);
+            updateSystem();
+            
+            setInterval(rotateSlideshow, 15000);
+            rotateSlideshow();
+            
+            setInterval(rotateHadith, 40000);
+        }
+
+        function updateSlideshowState() {
+            const container = document.getElementById('slideshow-container');
+            if(!container) return;
+            container.innerHTML = ''; 
+            
+            if (customImage) {
+                const img = document.createElement('img');
+                img.src = customImage;
+                img.className = 'slide-image slide-active';
+                img.style.objectFit = "contain";
+                img.style.backgroundColor = "#fff1f2";
+                container.appendChild(img);
+            } else {
+                currentSlideIdx = -1; 
+                rotateSlideshow();
+            }
+        }
+
+        function rotateSlideshow() {
+            if (customImage) return;
+            
+            const container = document.getElementById('slideshow-container');
+            if(!container) return;
+
+            currentSlideIdx = (currentSlideIdx + 1) % defaultImages.length;
+            
+            const img = document.createElement('img');
+            img.src = defaultImages[currentSlideIdx];
+            img.className = 'slide-image';
+            
+            const old = container.querySelector('.slide-active');
+            if (old) {
+                old.classList.remove('slide-active');
+                setTimeout(() => old.remove(), 2000);
+            }
+            
+            container.appendChild(img);
+            requestAnimationFrame(() => requestAnimationFrame(() => img.classList.add('slide-active')));
+        }
+
+        function rotateHadith() {
+            const el = document.getElementById('hadith-text');
+            const box = document.getElementById('hadith-box');
+            if(!el || !box) return;
+            
+            box.style.opacity = '0';
+            box.style.transform = 'translateY(2vh)';
+            
+            setTimeout(() => {
+                currentHadisIndex = (currentHadisIndex + 1) % hadisList.length;
+                el.textContent = `"${hadisList[currentHadisIndex]}"`;
+                box.style.opacity = '1';
+                box.style.transform = 'translateY(0)';
+            }, 600);
+        }
+
+        // --- ANA MANTIK: VAKİT HESAPLAMA & EZAN ---
+        function updateSystem() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+            
+            const clockEl = document.getElementById('clock-display');
+            if(clockEl) clockEl.textContent = timeStr;
+            const dateEl = document.getElementById('date-display');
+            if(dateEl) dateEl.textContent = now.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+            const curMinutes = now.getHours() * 60 + now.getMinutes();
+            const curSeconds = now.getSeconds();
+
+            const pMinutes = prayerTimes.map(p => {
+                const [h, m] = p.time.split(':').map(Number);
+                return h * 60 + m;
+            });
+
+            let nextIdx = 0;
+            let isNextDay = false;
+
+            for (let i = 0; i < pMinutes.length; i++) {
+                if (pMinutes[i] > curMinutes) {
+                    nextIdx = i;
+                    break;
+                }
+                if (i === pMinutes.length - 1) {
+                    nextIdx = 0;
+                    isNextDay = true;
+                }
+            }
+
+            let currentIdx = isNextDay ? 5 : (nextIdx === 0 ? 5 : nextIdx - 1);
+            if (!isNextDay && curMinutes < pMinutes[0]) {
+                currentIdx = 5;
+                nextIdx = 0;
+            }
+
+            let targetDate = new Date();
+            const [nH, nM] = prayerTimes[nextIdx].time.split(':').map(Number);
+            targetDate.setHours(nH, nM, 0, 0);
+            if (isNextDay) targetDate.setDate(targetDate.getDate() + 1);
+
+            const diff = targetDate - now;
+            const diffMin = Math.floor(diff / 60000);
+            
+            const h = String(Math.floor(diff / 3600000)).padStart(2,'0');
+            const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2,'0');
+            const s = String(Math.floor((diff % 60000) / 1000)).padStart(2,'0');
+            const countdownStr = `${h}:${m}:${s}`;
+
+            renderPrayerList(currentIdx, countdownStr);
+
+            const mainDisplay = document.getElementById('main-prayer-display');
+            const subDisplay = document.getElementById('main-prayer-sub');
+            const countdownBox = document.getElementById('countdown-box');
+            const countdownDisplay = document.getElementById('countdown-display');
+            const statusContainer = document.getElementById('status-container');
+
+            if (mainDisplay && subDisplay && countdownBox && statusContainer) {
+                const isNear = diffMin < 45; 
+                
+                if (isNear) {
+                    statusContainer.innerHTML = `<span class="bg-red-600 text-white px-4 py-1 rounded-full text-lg font-bold shadow animate-pulse">SONRAKİ VAKİT</span>`;
+                    mainDisplay.textContent = prayerTimes[nextIdx].tr.toUpperCase();
+                    subDisplay.textContent = prayerTimes[nextIdx].it.toUpperCase();
+                    countdownBox.classList.remove('hidden');
+                    if(countdownDisplay) {
+                        countdownDisplay.textContent = countdownStr;
+                        if (diffMin < 5) countdownDisplay.classList.add('text-red-400');
+                        else countdownDisplay.classList.remove('text-red-400');
+                    }
+                } else {
+                    statusContainer.innerHTML = `<span class="bg-white/20 text-white px-4 py-1 rounded-full text-lg font-bold backdrop-blur-sm border border-white/30">ŞU ANKİ VAKİT</span>`;
+                    mainDisplay.textContent = prayerTimes[currentIdx].tr.toUpperCase();
+                    subDisplay.textContent = prayerTimes[currentIdx].it.toUpperCase();
+                    countdownBox.classList.add('hidden');
+                }
+            }
+
+            if (diffMin === 0 && parseInt(s) === 0 && !adhanPlaying) {
+                playAdhan(prayerTimes[nextIdx].tr);
+            }
+        }
+
+        function renderPrayerList(activeIdx, countdownStr) {
+            const list = document.getElementById('prayer-list');
+            if(!list) return;
+            list.innerHTML = '';
+
+            prayerTimes.forEach((p, i) => {
+                const isActive = i === activeIdx;
+                const div = document.createElement('div');
+                
+                let classes = "prayer-row flex items-center justify-between px-[2vh] py-[1vh] rounded-r-lg ";
+                if (isActive) classes += "prayer-active";
+                else if (i < activeIdx || (activeIdx === 5 && i !== 5)) classes += "prayer-past"; 
+                else classes += "prayer-future";
+                
+                div.className = classes;
+                div.innerHTML = `
+                    <div class="flex flex-col">
+                        <span class="text-[2.2vh] font-black uppercase leading-none">${p.tr}</span>
+                        <span class="text-[1.4vh] font-bold opacity-70 uppercase tracking-wider">${p.it}</span>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <span class="text-[3.5vh] font-black tabular-nums leading-none tracking-tight">${p.time}</span>
+                        ${isActive ? `<span class="text-[1.2vh] font-mono opacity-90 mt-1 bg-black/20 px-1 rounded text-white">${countdownStr}</span>` : ''}
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // --- EZAN ---
+        window.playAdhan = (prayerName) => {
+            if (adhanPlaying) return;
+            adhanPlaying = true;
+            
+            const overlay = document.getElementById('ezan-overlay');
+            const nameEl = document.getElementById('ezan-prayer-name');
+            if(nameEl) nameEl.textContent = prayerName;
+            if(overlay) overlay.classList.add('active');
+            
+            const audio = document.getElementById('ezan-player');
+            if(audio) {
+                audio.currentTime = 0;
+                audio.play().catch(e => console.log("Otomatik oynatma engellendi:", e));
+            }
+            
+            const flash = document.getElementById('flash-layer');
+            if(flash) {
+                flash.classList.remove('hidden');
+                flash.classList.add('flash-effect');
+                setTimeout(() => {
+                    flash.classList.remove('flash-effect');
+                    flash.classList.add('hidden');
+                }, 3000);
+            }
+            setTimeout(stopAdhan, 300000); 
+        };
+
+        window.stopAdhan = () => {
+            const overlay = document.getElementById('ezan-overlay');
+            const audio = document.getElementById('ezan-player');
+            if(overlay) overlay.classList.remove('active');
+            if(audio) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+            adhanPlaying = false;
+        };
+        
+        window.toggleFullScreen = () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(e=>console.log(e));
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        };
+
+        // --- ADMIN FONKSİYONLARI ---
+        function fillAdminForm(data) {
+             const pData = data?.prayerTimes || prayerTimes;
+             pData.forEach(p => {
+                const el = document.getElementById(`time-${p.id}`);
+                if(el && document.activeElement !== el) el.value = p.time;
+            });
+            const cEl = document.getElementById('time-cuma');
+            if(cEl && document.activeElement !== cEl) cEl.value = data?.fridayTime || fridayTime;
+            
+            const mEl = document.getElementById('admin-marquee-input');
+            if(data?.marquee && mEl && document.activeElement !== mEl) mEl.value = data.marquee;
+        }
+
+        function initAdmin() {
+            // İlk verileri doldur
+            if(isFirebaseActive && settingsDocRef) {
+                 // onSnapshot zaten hallediyor
+            } else {
+                fillAdminForm(getLocalDB());
+            }
+
+            window.savePrayerTimes = async () => {
+                const newTimes = prayerTimes.map(p => ({
+                    ...p,
+                    time: document.getElementById(`time-${p.id}`).value || p.time
+                }));
+                const newFriday = document.getElementById('time-cuma').value || fridayTime;
+
+                const payload = { prayerTimes: newTimes, fridayTime: newFriday };
+                await saveData(payload);
+                alert('Vakitler güncellendi!');
+            };
+
+            window.updateMarquee = async () => {
+                const val = document.getElementById('admin-marquee-input').value;
+                await saveData({ marquee: val });
+                alert('Kayan yazı güncellendi!');
+            };
+
+            window.sendAnnouncement = async () => {
+                const val = document.getElementById('admin-announcement-input').value;
+                if (!val) return;
+                await saveData({ announcement: val });
+                alert('Duyuru yayınlandı!');
+            };
+
+            window.clearAnnouncement = async () => {
+                await saveData({ announcement: "" }); 
+                alert('Duyuru kaldırıldı.');
+            };
+
+            window.uploadImage = () => {
+                const file = document.getElementById('admin-image-input').files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    if (e.target.result.length > 900000) {
+                        alert("Resim çok büyük! Lütfen küçültüp tekrar deneyin (Max 900KB).");
+                        return;
+                    }
+                    await saveData({ customImage: e.target.result });
+                    alert("Resim yüklendi!");
+                };
+                reader.readAsDataURL(file);
+            };
+
+            window.resetImage = async () => {
+                await saveData({ customImage: null });
+                alert("Varsayılan slayt gösterisine dönüldü.");
+            };
+
+            async function saveData(data) {
+                if (isFirebaseActive && settingsDocRef) {
+                    await setDoc(settingsDocRef, data, { merge: true });
+                } else {
+                    saveLocalDB(data);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
